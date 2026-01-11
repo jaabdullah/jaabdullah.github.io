@@ -1,0 +1,7 @@
+{
+  "openalexAuthorId": "https://openalex.org/A5009869341",
+  "citationsByYearOverrides": null,
+  "worksOverride": null,
+  "totalCitationsOverride": null,
+  "notes": "Keep overrides null to keep metrics fully automatic from OpenAlex. If you want to display Google Scholar's per-year bar chart, you can fill citationsByYearOverrides manually, but totals may differ because each platform computes citations differently."
+}

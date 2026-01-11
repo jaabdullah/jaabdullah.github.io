@@ -1,0 +1,25 @@
+{
+  "overrides": [
+    {
+      "match": { "title_contains": "Desarrollo de nanopartículas de óxidos metálicos" },
+      "set": { "type": "book-chapter", "typeLabel": "Book chapter" }
+    },
+    {
+      "match": { "title_contains": "Phenix Dactylifera" },
+      "set": { "type": "book-chapter", "typeLabel": "Book chapter" }
+    }
+  ],
+  "additions": [
+    {
+      "type": "dissertation",
+      "typeLabel": "Thesis",
+      "year": 2024,
+      "title": "Sustainable Development of Metal Oxide Nanoparticles for Advanced Applications in Bioplastic Matrices",
+      "source": "Universidad de Sevilla (PRISMA)",
+      "doi": null,
+      "url": "https://prisma.us.es/publicacion/247317"
+      ,
+      "force": true
+    }
+  ]
+}
