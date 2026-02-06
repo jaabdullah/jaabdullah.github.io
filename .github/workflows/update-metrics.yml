@@ -3,7 +3,7 @@ name: Update Scholar & Scopus metrics
 on:
   workflow_dispatch:
   schedule:
-    - cron: "15 6 */3 * *"  # every 3 days 06:15 UTC
+        - cron: "15 6 * * *"
 
 permissions:
   contents: write
