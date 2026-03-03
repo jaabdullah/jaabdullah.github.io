@@ -3,21 +3,21 @@
   "method": "serpapi_google_scholar_author",
   "authorId": "t5EiMZoAAAAJ",
   "totals": {
-    "citationsAll": null,
-    "citationsSince": null,
-    "hIndexAll": null,
-    "hIndexSince": null,
-    "i10IndexAll": null,
-    "i10IndexSince": null
+    "citationsAll": 2221,
+    "citationsSince": 2216,
+    "hIndexAll": 28,
+    "hIndexSince": 28,
+    "i10IndexAll": 45,
+    "i10IndexSince": 45
   },
   "citationsByYear": {
     "2020": 0,
-    "2021": 0,
-    "2022": 0,
-    "2023": 0,
-    "2024": 0,
-    "2025": 0,
-    "2026": 0
+    "2021": 29,
+    "2022": 65,
+    "2023": 111,
+    "2024": 463,
+    "2025": 1269,
+    "2026": 273
   },
   "data": [
     {
@@ -26,27 +26,27 @@
     },
     {
       "year": 2021,
-      "citations": 0
+      "citations": 29
     },
     {
       "year": 2022,
-      "citations": 0
+      "citations": 65
     },
     {
       "year": 2023,
-      "citations": 0
+      "citations": 111
     },
     {
       "year": 2024,
-      "citations": 0
+      "citations": 463
     },
     {
       "year": 2025,
-      "citations": 0
+      "citations": 1269
     },
     {
       "year": 2026,
-      "citations": 0
+      "citations": 273
     }
   ]
 }
