@@ -1,9 +1,9 @@
 {
-  "lastUpdated": "2026-03-09",
+  "lastUpdated": "2026-03-10",
   "method": "serpapi_google_scholar_author",
   "authorId": "t5EiMZoAAAAJ",
   "totals": {
-    "citationsAll": 2240,
+    "citationsAll": 2241,
     "citationsSince": 2235,
     "hIndexAll": 29,
     "hIndexSince": 29,
