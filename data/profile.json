@@ -11,16 +11,16 @@
   "topscinetUrl": "https://topscinet.com/",
   "citationsChartStartYear": 2020,
   "googleScholar": {
-    "citations": 2241,
-    "citationsSince": 2235,
+    "citations": 2266,
+    "citationsSince": 2260,
     "sinceYear": 2021,
     "hIndex": 29,
     "hIndexSince": 29,
-    "i10Index": 45,
-    "i10IndexSince": 45
+    "i10Index": 46,
+    "i10IndexSince": 46
   },
   "scopus": {
-    "citations": 1915,
+    "citations": 1916,
     "documents": 60,
     "hIndex": 27,
     "i10Index": null
