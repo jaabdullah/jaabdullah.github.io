@@ -435,7 +435,11 @@ async function loadPublications() {
 
         const title = ws?.title?.title?.value || "";
         const year = ws?.["publication-date"]?.year?.value || null;
-        const type = normalizeType(ws?.type);
+        let type = normalizeType(ws?.type);
+
+if (type === "article" && looksLikeReview(title, "")) {
+  type = "review";
+}
 
         const extIds = ws?.["external-ids"]?.["external-id"] || [];
         let doi = null;
