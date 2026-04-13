@@ -355,8 +355,13 @@ function normalizeFromOpenAlex(w) {
   const title = w?.title || "";
   const source = w?.host_venue?.display_name || "";
   const url = w?.primary_location?.landing_page_url || (doi ? `https://doi.org/${doi}` : "");
-  const type = normalizeOAType(w?.type);
-  const typeLabel = openalexTypeLabel(type);
+  let type = normalizeOAType(w?.type);
+
+if (type === "article" && looksLikeReview(w?.title || "", w?.host_venue?.display_name || "")) {
+  type = "review";
+}
+
+const typeLabel = openalexTypeLabel(type);
   const citations = Number.isFinite(Number(w?.cited_by_count)) ? Number(w.cited_by_count) : 0;
 
   return { title, source, year, doi, url, citations, type: type || "other", typeLabel };
