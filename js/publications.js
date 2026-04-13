@@ -310,7 +310,27 @@ function normalizeOAType(t) {
 
   return "other";
 }
+function looksLikeReview(title = "", source = "") {
+  const text = `${title} ${source}`.toLowerCase();
 
+  const reviewPatterns = [
+    " review",
+    "systematic review",
+    "critical review",
+    "mini review",
+    "minireview",
+    "state-of-the-art",
+    "state of the art",
+    "overview",
+    "bibliometric",
+    "meta-analysis",
+    "meta analysis",
+    "scoping review",
+    "narrative review"
+  ];
+
+  return reviewPatterns.some(p => text.includes(p));
+}
 function openalexTypeLabel(t) {
   if (!t) return "Other";
   const map = {
