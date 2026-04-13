@@ -23,14 +23,18 @@ const sortYearBtn = document.getElementById("sortYear");
 const sortCitationsBtn = document.getElementById("sortCitations");
 let currentSort = "year"; // default: newest first
 
-
 let allRows = []; // cached normalized items
 
 function upsertAddition(rows, add) {
   if (!add?.title) return rows;
   const titleKey = String(add.title);
   const urlKey = add.url ? String(add.url) : null;
-  const idx = rows.findIndex(r => String(r.title || "") === titleKey || (urlKey && String(r.url || "") === urlKey));
+  const idx = rows.findIndex(
+    r => String(r.title || "") === titleKey || (urlKey && String(r.url || "") === urlKey)
+  );
+
+  const normalizedType = normalizeOAType(add.type || "other");
+
   if (idx === -1) {
     rows.push({
       title: add.title,
@@ -38,8 +42,9 @@ function upsertAddition(rows, add) {
       source: add.source || "",
       doi: add.doi || null,
       url: add.url || "",
-      type: add.type || "other",
-      typeLabel: add.typeLabel || openalexTypeLabel(add.type)
+      citations: Number(add.citations || 0),
+      type: normalizedType,
+      typeLabel: add.typeLabel || openalexTypeLabel(normalizedType)
     });
     return rows;
   }
@@ -53,8 +58,9 @@ function upsertAddition(rows, add) {
       source: add.source || rows[idx].source,
       doi: add.doi ?? rows[idx].doi,
       url: add.url || rows[idx].url,
-      type: add.type || rows[idx].type,
-      typeLabel: add.typeLabel || openalexTypeLabel(add.type) || rows[idx].typeLabel
+      citations: Number(add.citations ?? rows[idx].citations ?? 0),
+      type: normalizedType || rows[idx].type,
+      typeLabel: add.typeLabel || openalexTypeLabel(normalizedType) || rows[idx].typeLabel
     };
   }
   return rows;
@@ -79,46 +85,49 @@ function applyPublicationOverrides(rows, overrides) {
     for (const p of out) {
       const title = String(p.title || "");
       const url = String(p.url || "");
-      // More robust matching: case-insensitive + accent-insensitive substring
       const norm = (s) => String(s || "")
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
+
       const titleOk = match.title_contains ? norm(title).includes(norm(match.title_contains)) : true;
       const urlOk = match.url ? url === match.url : true;
       const doiOk = match.doi ? String(p.doi || "") === String(match.doi) : true;
-      if (titleOk && urlOk && doiOk) Object.assign(p, set);
+
+      if (titleOk && urlOk && doiOk) {
+        Object.assign(p, set);
+        p.type = normalizeOAType(p.type || "other");
+        p.typeLabel = openalexTypeLabel(p.type);
+      }
     }
   }
   return out;
 }
 
 function normalizeType(orcidType) {
-  // PUB_ORCID uses "journal-article", "conference-paper", etc. (varies)
   if (!orcidType) return "other";
-  const t = String(orcidType).toLowerCase();
-  // We normalize everything to OpenAlex-style work types so filtering is consistent.
-  if (t.includes("journal")) return "article";
+  const t = String(orcidType).toLowerCase().trim();
+
+  if (t === "paratext") return "other";
   if (t.includes("review")) return "review";
+  if (t.includes("journal")) return "article";
   if (t.includes("conference") || t.includes("proceedings")) return "proceedings-article";
   if (t.includes("book-chapter")) return "book-chapter";
   if (t.includes("dissertation") || t.includes("thesis")) return "dissertation";
   if (t.includes("book")) return "book";
-  if (t.includes("preprint")) return "preprint";
+  if (t.includes("preprint") || t.includes("posted-content")) return "preprint";
+
   return "other";
 }
 
 function doiFromUrl(url) {
   if (!url) return null;
-  // Typical DOI URL: https://doi.org/10.xxxx/xxxx
-  const m = String(url).match(/10\.\d{4,9}\/[-._;()\/:A-Z0-9]+/i);
+  const m = String(url).match(/10\.\d{4,9}\/[-._;()/:A-Z0-9]+/i);
   return m ? m[0] : null;
 }
 
-
 async function loadMetricOverrides() {
   try {
-    // Optional local file to override specific years (e.g., align with Google Scholar)
     const r = await fetch(`data/metrics_override.json?ts=${Date.now()}`, { cache: "no-store" });
     if (!r.ok) return null;
     return await r.json();
@@ -136,12 +145,10 @@ function applyOverridesToCounts(countsByYear, overrides) {
     item.cited_by_count = Number(val);
     map.set(y, item);
   }
-  // return sorted array
-  return Array.from(map.values()).sort((a,b)=>a.year-b.year);
+  return Array.from(map.values()).sort((a, b) => a.year - b.year);
 }
 
 async function fetchJson(url, headers = {}) {
-  // Add a timeout so the UI doesn't get stuck forever on slow/blocked networks.
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), 15000);
   const r = await fetch(url, { headers, signal: controller.signal });
@@ -151,7 +158,6 @@ async function fetchJson(url, headers = {}) {
 }
 
 function typeLabel(t) {
-  // Labels for PUB_ORCID/Crossref types (fallback path)
   const map = {
     "article": "Article",
     "review": "Review",
@@ -164,26 +170,7 @@ function typeLabel(t) {
     other: "Other"
   };
   const key = String(t || "other").toLowerCase();
-  return map[key] || key.replaceAll("-", " ");
-}
-
-async function crossrefMeta(doi) {
-  const url = `https://api.crossref.org/works/${encodeURIComponent(doi)}`;
-  const data = await fetchJson(url, { "Accept": "application/json" });
-  const item = data?.message;
-  if (!item) return null;
-
-  const year =
-    item?.published?.["date-parts"]?.[0]?.[0] ||
-    item?.issued?.["date-parts"]?.[0]?.[0] ||
-    null;
-
-  return {
-    source: item["container-title"]?.[0] || "",
-    year,
-    type: item.type || "",
-    url: item.URL || (doi ? `https://doi.org/${doi}` : "")
-  };
+  return map[key] || "Other";
 }
 
 function render(rows) {
@@ -223,25 +210,28 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
-function stripTags(s){
+function stripTags(s) {
   return String(s ?? "").replace(/<[^>]*>/g, "");
 }
 
-
-function sortRows(rows){
+function sortRows(rows) {
   const list = [...rows];
   if (currentSort === "citations") {
-    list.sort((a,b) => (Number(b.citations||0) - Number(a.citations||0)) ||
-      (Number(b.year||0) - Number(a.year||0)) ||
-      String(a.title||"").localeCompare(String(b.title||"")));
+    list.sort((a, b) =>
+      (Number(b.citations || 0) - Number(a.citations || 0)) ||
+      (Number(b.year || 0) - Number(a.year || 0)) ||
+      String(a.title || "").localeCompare(String(b.title || ""))
+    );
   } else {
-    list.sort((a,b) => (Number(b.year||0) - Number(a.year||0)) ||
-      String(a.title||"").localeCompare(String(b.title||"")));
+    list.sort((a, b) =>
+      (Number(b.year || 0) - Number(a.year || 0)) ||
+      String(a.title || "").localeCompare(String(b.title || ""))
+    );
   }
   return list;
 }
 
-function setSort(mode){
+function setSort(mode) {
   currentSort = mode;
   if (sortYearBtn && sortCitationsBtn) {
     sortYearBtn.classList.toggle("is-active", mode === "year");
@@ -254,10 +244,9 @@ function applyFilters() {
   const q = (searchInput.value || "").toLowerCase().trim();
   const t = String(typeSelect.value || "all").toLowerCase();
 
-  const known = ["article","review","proceedings-article","book-chapter","dissertation","book","preprint"];
+  const known = ["article", "review", "proceedings-article", "book-chapter", "dissertation", "book", "preprint"];
 
   const filtered = allRows.filter(r => {
-    // Defensive normalization: some sources (or overrides) may carry non-normalized types
     const rowType = normalizeOAType(r?.type || r?.typeLabel || "");
 
     const matchesType = (t === "all")
@@ -274,52 +263,55 @@ function applyFilters() {
   render(sortRows(filtered));
 }
 
-
 async function fetchAllOpenAlexWorks() {
   const cacheKey = `oa_works_${PUB_ORCID}`;
-  // If offline or OpenAlex blocked, try cache
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    try { const c = JSON.parse(localStorage.getItem(cacheKey) || "null"); if (c?.items?.length) return c.items; } catch(_){}
+    try {
+      const c = JSON.parse(localStorage.getItem(cacheKey) || "null");
+      if (c?.items?.length) return c.items;
+    } catch (_) {}
   }
 
-  // Primary source for publications (more complete than PUB_ORCID in many profiles)
   const items = [];
   let cursor = "*";
-  // OpenAlex stores PUB_ORCID as a full URL: https://orcid.org/0000-0000-0000-0000
   const orcidUrl = `https://orcid.org/${PUB_ORCID}`;
   const base = `https://api.openalex.org/works?filter=authorships.author.orcid:${encodeURIComponent(orcidUrl)}&per-page=200&cursor=`;
+
   while (cursor) {
     const url = base + encodeURIComponent(cursor);
     const data = await fetchJson(url, { "Accept": "application/json" });
     const results = data?.results || [];
     for (const w of results) items.push(w);
     cursor = data?.meta?.next_cursor || null;
-    // Safety stop (prevents accidental infinite loop)
     if (items.length > 2000) break;
   }
-  try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), items })); } catch(_){ }
+
+  try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), items })); } catch (_) {}
   return items;
 }
 
-function normalizeOAType(t){
+function normalizeOAType(t) {
   if (!t) return "other";
-  const s = String(t).toLowerCase();
-  // OpenAlex sometimes returns "posted-content" for preprints.
+  const s = String(t).toLowerCase().trim();
+
+  if (s === "paratext") return "other";
   if (s.includes("posted") || s === "posted-content") return "preprint";
-  // Some sources may still provide ORCID-like labels.
-  if (s.includes("journal-article") || (s.includes("journal") && s.includes("article"))) return "article";
+  if (s.includes("review")) return "review";
   if (s.includes("conference") || s.includes("proceedings")) return "proceedings-article";
   if (s.includes("book-chapter")) return "book-chapter";
   if (s.includes("dissertation") || s.includes("thesis")) return "dissertation";
-  if (s.includes("review")) return "review";
-  if (s.includes("book")) return "book";
+  if (s === "book" || s.includes("book")) return "book";
+  if (s.includes("journal-article") || (s.includes("journal") && s.includes("article"))) return "article";
   if (s.includes("preprint")) return "preprint";
-  // keep known OpenAlex types (article, review, preprint, etc.)
-  return s;
+
+  if (["article", "review", "preprint", "book", "book-chapter", "proceedings-article", "dissertation"].includes(s)) {
+    return s;
+  }
+
+  return "other";
 }
 
 function openalexTypeLabel(t) {
-  // OpenAlex work types: "article", "book-chapter", "preprint", etc.
   if (!t) return "Other";
   const map = {
     article: "Article",
@@ -330,10 +322,11 @@ function openalexTypeLabel(t) {
     "proceedings-article": "Conference paper",
     "posted-content": "Preprint",
     dissertation: "Thesis",
-    dataset: "Dataset"
+    dataset: "Dataset",
+    other: "Other"
   };
-  const key = String(t).toLowerCase();
-  return map[key] || key.replaceAll("-", " ");
+  const key = normalizeOAType(t);
+  return map[key] || "Other";
 }
 
 function normalizeFromOpenAlex(w) {
@@ -342,58 +335,52 @@ function normalizeFromOpenAlex(w) {
   const title = w?.title || "";
   const source = w?.host_venue?.display_name || "";
   const url = w?.primary_location?.landing_page_url || (doi ? `https://doi.org/${doi}` : "");
-    const type = normalizeOAType(w?.type);
+  const type = normalizeOAType(w?.type);
   const typeLabel = openalexTypeLabel(type);
-  // OpenAlex per-work citations
-  // Ensure it's always a number so sorting works reliably.
   const citations = Number.isFinite(Number(w?.cited_by_count)) ? Number(w.cited_by_count) : 0;
 
-    return { title, source, year, doi, url, citations, type: type || "other", typeLabel };
+  return { title, source, year, doi, url, citations, type: type || "other", typeLabel };
 }
 
 async function loadPublications() {
   try {
-    // Load PUB_ORCID from profile.json
     const profile = await loadProfile();
 
-if (profile?.__error === "file_protocol") {
-  pubBody.innerHTML = `<tr><td colspan="6" class="muted">Publications cannot load when opened via <code>file://</code>. Please run a local server (e.g., VSCode Live Server) and open the site via <code>http://localhost</code>.</td></tr>`;
-  return;
-}
-if (profile?.__error === "fetch_failed") {
-  pubBody.innerHTML = `<tr><td colspan="6" class="muted">Could not load <code>data/profile.json</code>. Please run a local server and check the browser console.</td></tr>`;
-  return;
-}
+    if (profile?.__error === "file_protocol") {
+      pubBody.innerHTML = `<tr><td colspan="6" class="muted">Publications cannot load when opened via <code>file://</code>. Please run a local server (e.g., VSCode Live Server) and open the site via <code>http://localhost</code>.</td></tr>`;
+      return;
+    }
+    if (profile?.__error === "fetch_failed") {
+      pubBody.innerHTML = `<tr><td colspan="6" class="muted">Could not load <code>data/profile.json</code>. Please run a local server and check the browser console.</td></tr>`;
+      return;
+    }
 
-PUB_ORCID = String(profile?.orcid || PUB_ORCID || "").replaceAll("https://orcid.org/", "").trim();
-if (!PUB_ORCID) {
-  pubBody.innerHTML = `<tr><td colspan="6" class="muted">Please set your PUB_ORCID in <code>data/profile.json</code>.</td></tr>`;
-  return;
-}
+    PUB_ORCID = String(profile?.orcid || PUB_ORCID || "").replaceAll("https://orcid.org/", "").trim();
+    if (!PUB_ORCID) {
+      pubBody.innerHTML = `<tr><td colspan="6" class="muted">Please set your PUB_ORCID in <code>data/profile.json</code>.</td></tr>`;
+      return;
+    }
 
     pubBody.innerHTML = `<tr><td colspan="6" class="muted">Fetching publications…</td></tr>`;
 
-    // Local additions/overrides (small file you can maintain)
     const pubFixes = await loadPublicationOverrides();
 
-    // Cache (24h) to keep the site fast + resilient
     const cacheKey = `ny_pubs_${PUB_ORCID}`;
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached);
       const ageH = (Date.now() - parsed.ts) / 36e5;
-      // If we changed the schema (e.g., added per-paper citations),
-      // ignore older cached copies that don't contain the new fields.
       const hasCitationsField = Array.isArray(parsed.items) && parsed.items.every(it => typeof it?.citations === "number");
+
       if (ageH < 24 && Array.isArray(parsed.items) && hasCitationsField) {
-        // IMPORTANT: still apply the latest overrides + additions,
-        // otherwise a cached copy can keep old misclassifications forever.
         let cachedRows = Array.isArray(parsed.items) ? parsed.items : [];
         cachedRows = applyPublicationOverrides(cachedRows, pubFixes.overrides);
         for (const add of (pubFixes.additions || [])) upsertAddition(cachedRows, add);
 
-        // Keep sorting consistent
-        cachedRows.sort((a, b) => (Number(b.year || 0) - Number(a.year || 0)) || String(a.title).localeCompare(String(b.title)));
+        cachedRows.sort((a, b) =>
+          (Number(b.year || 0) - Number(a.year || 0)) ||
+          String(a.title).localeCompare(String(b.title))
+        );
 
         allRows = cachedRows;
         localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), items: allRows }));
@@ -404,16 +391,13 @@ if (!PUB_ORCID) {
 
     let rows = [];
 
-    // 1) OpenAlex (preferred)
     try {
       const oaWorks = await fetchAllOpenAlexWorks();
       rows = oaWorks.map(normalizeFromOpenAlex);
     } catch (e) {
-      // If OpenAlex is blocked on the user's network, fall back to PUB_ORCID
       rows = [];
     }
 
-    // 2) If OpenAlex returned nothing (or failed), fallback to PUB_ORCID
     if (!rows.length) {
       const works = await fetchJson(`https://pub.orcid.org/v3.0/${PUB_ORCID}/works`, { "Accept": "application/json" });
       const groups = works?.group || [];
@@ -441,30 +425,59 @@ if (!PUB_ORCID) {
         if (doi) url = `https://doi.org/${doi}`;
         else if (ws?.url?.value) url = ws.url.value;
 
-        summaries.push({ title, source: "", year, doi, url, type, typeLabel: typeLabel(type) });
+        summaries.push({
+          title,
+          source: "",
+          year,
+          doi,
+          url,
+          citations: 0,
+          type,
+          typeLabel: typeLabel(type)
+        });
       }
       rows = summaries;
     }
 
-    // Enrich missing venue/year via Crossref (only when DOI exists and data is missing)
     let enriched = [];
     for (const r of rows) {
       if (r.doi && (!r.source || !r.year)) {
         try {
           const meta = await crossrefMeta(r.doi);
-          enriched.push({ ...r, ...meta, typeLabel: r.typeLabel || typeLabel(r.type) });
+
+          const finalType = (
+            r.type &&
+            r.type !== "other" &&
+            r.type !== "article"
+          )
+            ? r.type
+            : normalizeOAType(meta?.type || r.type);
+
+          enriched.push({
+            ...r,
+            ...meta,
+            type: finalType,
+            typeLabel: openalexTypeLabel(finalType)
+          });
           continue;
         } catch (_) { /* ignore */ }
       }
-      enriched.push(r);
+
+      const finalType = normalizeOAType(r.type);
+      enriched.push({
+        ...r,
+        type: finalType,
+        typeLabel: openalexTypeLabel(finalType)
+      });
     }
 
-    // Apply local overrides + inject additions (e.g., thesis from PRISMA)
     enriched = applyPublicationOverrides(enriched, pubFixes.overrides);
     for (const add of (pubFixes.additions || [])) upsertAddition(enriched, add);
 
-    // Sort: newest first
-    enriched.sort((a, b) => (Number(b.year || 0) - Number(a.year || 0)) || String(a.title).localeCompare(String(b.title)));
+    enriched.sort((a, b) =>
+      (Number(b.year || 0) - Number(a.year || 0)) ||
+      String(a.title).localeCompare(String(b.title))
+    );
 
     allRows = enriched;
     localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), items: allRows }));
@@ -475,15 +488,15 @@ if (!PUB_ORCID) {
   }
 }
 
-
 function pickBestSummary(list) {
-  // Prefer: has DOI, then has year, then newest year
   let best = null;
 
   for (const ws of list) {
     const year = Number(ws?.["publication-date"]?.year?.value || 0);
     const extIds = ws?.["external-ids"]?.["external-id"] || [];
-    const hasDoi = extIds.some(e => String(e?.["external-id-type"]).toLowerCase() === "doi" && e?.["external-id-value"]);
+    const hasDoi = extIds.some(e =>
+      String(e?.["external-id-type"]).toLowerCase() === "doi" && e?.["external-id-value"]
+    );
     const score = (hasDoi ? 1000 : 0) + (year ? year : 0);
 
     if (!best || score > best.score) best = { ws, score };
@@ -491,7 +504,6 @@ function pickBestSummary(list) {
   return best?.ws || list[0] || null;
 }
 
-// Wire up filters (safe even if the table hasn't loaded yet)
 if (searchInput) searchInput.addEventListener("input", applyFilters);
 if (typeSelect) typeSelect.addEventListener("change", applyFilters);
 if (sortYearBtn) sortYearBtn.addEventListener("click", () => setSort("year"));
