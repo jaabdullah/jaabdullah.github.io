@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "2026-08-03",
+  "lastUpdated": "2026-08-04",
   "method": "serpapi_google_scholar_author",
   "authorId": "t5EiMZoAAAAJ",
   "totals": {
-    "citationsAll": 2766,
-    "citationsSince": 2760,
+    "citationsAll": 2790,
+    "citationsSince": 2784,
     "hIndexAll": 31,
     "hIndexSince": 31,
     "i10IndexAll": 49,
@@ -17,7 +17,7 @@
     "2023": 112,
     "2024": 471,
     "2025": 1255,
-    "2026": 814
+    "2026": 838
   },
   "data": [
     {
@@ -46,7 +46,7 @@
     },
     {
       "year": 2026,
-      "citations": 814
+      "citations": 838
     }
   ]
 }
