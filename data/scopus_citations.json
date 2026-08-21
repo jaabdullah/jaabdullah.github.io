@@ -1,18 +1,18 @@
 {
-  "lastUpdated": "2026-08-20",
+  "lastUpdated": "2026-08-21",
   "method": "grouped_by_publication_year_using_scopus_search",
   "citationsByYear": {
-    "2020": 250,
+    "2020": 251,
     "2022": 160,
     "2023": 514,
-    "2024": 1040,
+    "2024": 1041,
     "2025": 457,
     "2026": 3
   },
   "data": [
     {
       "year": 2020,
-      "citations": 250
+      "citations": 251
     },
     {
       "year": 2022,
@@ -24,7 +24,7 @@
     },
     {
       "year": 2024,
-      "citations": 1040
+      "citations": 1041
     },
     {
       "year": 2025,
