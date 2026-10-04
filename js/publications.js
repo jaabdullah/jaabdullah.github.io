@@ -78,29 +78,46 @@ async function loadPublicationOverrides() {
 }
 
 function applyPublicationOverrides(rows, overrides) {
-  const out = rows.map(r => ({ ...r }));
-  for (const rule of (overrides || [])) {
-    const match = rule?.match || {};
-    const set = rule?.set || {};
-    for (const p of out) {
+  const out = [];
+  const normText = (s) => String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const normDoi = (s) => String(s || "")
+    .trim()
+    .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")
+    .toLowerCase();
+
+  for (const original of (rows || [])) {
+    const p = { ...original };
+    let excluded = false;
+
+    for (const rule of (overrides || [])) {
+      const match = rule?.match || {};
+      const set = rule?.set || {};
+
       const title = String(p.title || "");
       const url = String(p.url || "");
-      const norm = (s) => String(s || "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
 
-      const titleOk = match.title_contains ? norm(title).includes(norm(match.title_contains)) : true;
+      const titleOk = match.title_contains ? normText(title).includes(normText(match.title_contains)) : true;
       const urlOk = match.url ? url === match.url : true;
-      const doiOk = match.doi ? String(p.doi || "") === String(match.doi) : true;
+      const doiOk = match.doi ? normDoi(p.doi) === normDoi(match.doi) : true;
 
       if (titleOk && urlOk && doiOk) {
+        if (rule?.exclude === true) {
+          excluded = true;
+          break;
+        }
+
         Object.assign(p, set);
         p.type = normalizeOAType(p.type || "other");
-        p.typeLabel = openalexTypeLabel(p.type);
+        p.typeLabel = set.typeLabel || openalexTypeLabel(p.type);
       }
     }
+
+    if (!excluded) out.push(p);
   }
+
   return out;
 }
 
